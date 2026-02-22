@@ -2,7 +2,7 @@
 
 A modular Python implementation of an insurance support multi-agent system using:
 - LangGraph for orchestration
-- Google Gemini (via OpenAI-compatible endpoint) for LLM/tool-calling
+- Google Gemini for LLM/tool-calling
 - ChromaDB for FAQ retrieval (RAG)
 - SQLite for structured policy/billing/claims data
 - Phoenix/OpenTelemetry for tracing
@@ -29,11 +29,11 @@ Flow:
 ```text
 insurance_multi-agent-system/
 +-- src/
-¦   +-- setup.py            # env loading + tracing decorator
-¦   +-- data_pipeline.py    # FAQ ingest + synthetic data + SQLite setup
-¦   +-- prompts.py          # all prompt templates
-¦   +-- agents.py           # LLM client + tools + agent nodes
-¦   +-- workflow.py         # LangGraph graph + run_test_query
+Â¦   +-- setup.py            # env loading + tracing decorator
+Â¦   +-- data_pipeline.py    # FAQ ingest + synthetic data + SQLite setup
+Â¦   +-- prompts.py          # all prompt templates
+Â¦   +-- agents.py           # LLM client + tools + agent nodes
+Â¦   +-- workflow.py         # LangGraph graph + run_test_query
 +-- run_project.py          # main entrypoint
 +-- smoke_test_split.py     # compile-only smoke test
 +-- requirements.txt
