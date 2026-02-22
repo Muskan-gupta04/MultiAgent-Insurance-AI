@@ -1,18 +1,1 @@
-2026-02-22 12:54:40,567 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 429 Too Many Requests"
-2026-02-22 12:54:40,569 - openai._base_client - INFO - Retrying request to /chat/completions in 0.434911 seconds
-2026-02-22 12:54:41,185 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 429 Too Many Requests"
-2026-02-22 12:54:41,186 - openai._base_client - INFO - Retrying request to /chat/completions in 0.818578 seconds
-2026-02-22 12:54:42,208 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 429 Too Many Requests"
-2026-02-22 12:54:44,559 - opentelemetry.exporter.otlp.proto.grpc.exporter - WARNING - Transient error StatusCode.UNAVAILABLE encountered while exporting traces to localhost:4317, retrying in 0.89s.
-2026-02-22 12:54:51,226 - opentelemetry.exporter.otlp.proto.grpc.exporter - ERROR - Failed to export traces to localhost:4317, error code: StatusCode.UNAVAILABLE
-2026-02-22 12:54:51,256 - opentelemetry.exporter.otlp.proto.grpc.exporter - WARNING - Transient error StatusCode.UNAVAILABLE encountered while exporting traces to localhost:4317, retrying in 0.86s.
-2026-02-22 12:54:58,461 - opentelemetry.exporter.otlp.proto.grpc.exporter - ERROR - Failed to export traces to localhost:4317, error code: StatusCode.UNAVAILABLE
-2026-02-22 13:09:46,085 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 429 Too Many Requests"
-2026-02-22 13:09:46,087 - openai._base_client - INFO - Retrying request to /chat/completions in 0.434911 seconds
-2026-02-22 13:09:46,709 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 429 Too Many Requests"
-2026-02-22 13:09:46,711 - openai._base_client - INFO - Retrying request to /chat/completions in 0.818578 seconds
-2026-02-22 13:09:47,736 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 429 Too Many Requests"
-2026-02-22 13:09:50,073 - opentelemetry.exporter.otlp.proto.grpc.exporter - WARNING - Transient error StatusCode.UNAVAILABLE encountered while exporting traces to localhost:4317, retrying in 0.89s.
-2026-02-22 13:09:56,733 - opentelemetry.exporter.otlp.proto.grpc.exporter - ERROR - Failed to export traces to localhost:4317, error code: StatusCode.UNAVAILABLE
-2026-02-22 13:09:56,747 - opentelemetry.exporter.otlp.proto.grpc.exporter - WARNING - Transient error StatusCode.UNAVAILABLE encountered while exporting traces to localhost:4317, retrying in 0.86s.
-2026-02-22 13:10:03,969 - opentelemetry.exporter.otlp.proto.grpc.exporter - ERROR - Failed to export traces to localhost:4317, error code: StatusCode.UNAVAILABLE
+
