@@ -91,21 +91,6 @@ Compile smoke test:
 python smoke_test_split.py
 ```
 
-## Typical Runtime Issues
-
-1. `429 RESOURCE_EXHAUSTED` from Gemini
-- Cause: API quota/billing exhausted for your key/project/model.
-- Fix: enable billing/quota or use a model/key with available quota.
-
-2. Unicode/emoji console errors on Windows
-- Use:
-```powershell
-$env:PYTHONIOENCODING='utf-8'
-```
-
-3. Phoenix exporter warnings (`localhost:4317` unavailable)
-- Start Phoenix locally or remove/set `PHOENIX_COLLECTOR_ENDPOINT` appropriately.
-
 ## Custom Query
 
 You can run your own query from Python:
@@ -118,6 +103,3 @@ initialize_data_infrastructure()
 run_test_query("What is the premium of my auto insurance policy?")
 ```
 
-## License
-
-MIT (or project default license if specified elsewhere).
