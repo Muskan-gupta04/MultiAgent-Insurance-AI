@@ -1,5 +1,5 @@
 langgraph
-langchain-openai
+openai
 langchain-community
 duckduckgo-search
 beautifulsoup4
@@ -13,5 +13,4 @@ scikit-learn
 seaborn
 matplotlib
 datasets
-arize-phoenix-otel
-openinference-instrumentation-openai
+streamlit

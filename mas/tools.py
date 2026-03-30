@@ -13,14 +13,12 @@ def set_db_path(path: str):
 
 
 def ask_user(question: str, missing_info: str = "") -> Dict[str, Any]:
-    resources.logger.info(f"Asking user for input: {question}")
-    if missing_info:
-        print(f"---USER INPUT REQUIRED---\nMissing information: {missing_info}")
-    else:
-        print("---USER INPUT REQUIRED---")
-
-    answer = input(f"{question}: ")
-    return {"context": answer, "source": "User Input"}
+    """
+    DEPRECATED: This function uses blocking terminal input(). 
+    The system now uses asynchronous state-based clarification.
+    """
+    resources.logger.warning(f"Blocking ask_user called with: {question}. Returning empty response.")
+    return {"context": "PENDING_ASYNCHRONOUS_CLARIFICATION", "source": "System"}
 
 
 def get_policy_details(policy_number: str) -> Dict[str, Any]:

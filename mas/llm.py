@@ -7,21 +7,24 @@ def run_llm(
     prompt: str,
     tools: Optional[List[Dict]] = None,
     tool_functions: Optional[Dict[str, Any]] = None,
-    model: str = "gpt-5-mini",
+    model: str = "llama-3.1-8b-instant",
 ) -> str:
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": prompt}],
-        tools=tools if tools else None,
-        tool_choice="auto" if tools else None,
-    )
+    kwargs = {
+        "model": model,
+        "messages": [{"role": "system", "content": prompt}],
+    }
+    if tools:
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
+
+    response = client.chat.completions.create(**kwargs)
 
     message = response.choices[0].message
     if not getattr(message, "tool_calls", None):
         return message.content
 
     if not tool_functions:
-        return message.content + "\n\nNo tool functions provided to execute tool calls."
+        return str(message.content) + "\n\nNo tool functions provided to execute tool calls."
 
     tool_messages = []
     for tool_call in message.tool_calls:
@@ -38,25 +41,12 @@ def run_llm(
             "role": "tool",
             "tool_call_id": tool_call.id,
             "content": json.dumps(result),
+            "name": func_name
         })
 
     followup_messages = [
         {"role": "system", "content": prompt},
-        {
-            "role": "assistant",
-            "content": message.content,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": tc.type,
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments,
-                    },
-                }
-                for tc in message.tool_calls
-            ],
-        },
+        message,
         *tool_messages,
     ]
 

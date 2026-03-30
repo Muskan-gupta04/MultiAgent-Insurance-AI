@@ -11,7 +11,6 @@ from .prompts import (
     SUPERVISOR_PROMPT,
 )
 from . import resources
-from . import resources
 from .tools import (
     ask_user,
     get_auto_policy_details,
@@ -42,8 +41,8 @@ def supervisor_agent(state):
         }
 
     if state.get("needs_clarification", False):
-        user_clarification = state.get("user_clarification", "")
-        print(f"Processing user clarification: {user_clarification}")
+        user_clarification = state.get("user_input", "")
+        print(f"Processing user clarification from next turn: {user_clarification}")
 
         clarification_question = state.get("clarification_question", "")
         updated_conversation = (
@@ -54,12 +53,11 @@ def supervisor_agent(state):
         updated_state = state.copy()
         updated_state["needs_clarification"] = False
         updated_state["conversation_history"] = updated_conversation
-
+        
+        # Clear the clarification markers so the supervisor can re-evaluate with the new info
         if "clarification_question" in updated_state:
             del updated_state["clarification_question"]
-        if "user_clarification" in updated_state:
-            del updated_state["user_clarification"]
-
+        
         return updated_state
 
     user_query = state["user_input"]
@@ -104,7 +102,7 @@ def supervisor_agent(state):
 
     print("Calling LLM for supervisor decision...")
     response = resources.client.chat.completions.create(
-        model="gpt-5-mini",
+        model="llama-3.1-8b-instant",
         messages=[{"role": "system", "content": prompt}],
         tools=tools,
         tool_choice="auto",
@@ -113,28 +111,19 @@ def supervisor_agent(state):
     message = response.choices[0].message
 
     if getattr(message, "tool_calls", None):
-        print("Supervisor requesting user clarification")
         for tool_call in message.tool_calls:
             if tool_call.function.name == "ask_user":
                 args = json.loads(tool_call.function.arguments)
                 question = args.get("question", "Can you please provide more details?")
-                missing_info = args.get("missing_info", "additional information")
-
-                print(f"Asking user: {question}")
-
-                user_response_data = ask_user(question, missing_info)
-                user_response = user_response_data["context"]
-
-                print(f"User response: {user_response}")
-
-                updated_history = conversation_history + f"\nAssistant: {question}"
-                updated_history = updated_history + f"\nUser: {user_response}"
-
+                
+                print(f"Assistant needs clarification: {question}")
+                
                 return {
                     "needs_clarification": True,
                     "clarification_question": question,
-                    "user_clarification": user_response,
-                    "conversation_history": updated_history,
+                    "final_answer": question,
+                    "end_conversation": True,
+                    "conversation_history": conversation_history + f"\nAssistant: {question}",
                 }
 
     message_content = message.content
@@ -196,7 +185,12 @@ def claims_agent_node(state):
 
     result = run_llm(resources.client, prompt, tools, {"get_claim_status": get_claim_status})
     resources.logger.info("Claims agent completed")
-    return {"messages": [("assistant", result)]}
+    
+    current_history = state.get("conversation_history", "")
+    return {
+        "messages": [("assistant", result)],
+        "conversation_history": (current_history + f"\nClaims Agent: {result}")
+    }
 
 
 def final_answer_agent(state):
@@ -212,6 +206,10 @@ def final_answer_agent(state):
             recent_responses.append(msg.content)
             if len(recent_responses) >= 2:
                 break
+        elif type(msg) == tuple and msg[0] == "assistant" and "clarification" not in str(msg[1]).lower():
+            recent_responses.append(msg[1])
+            if len(recent_responses) >= 2:
+                break
 
     specialist_response = recent_responses[0] if recent_responses else "No response available"
 
@@ -222,7 +220,7 @@ def final_answer_agent(state):
 
     print("Generating final summary...")
     response = resources.client.chat.completions.create(
-        model="gpt-5-mini",
+        model="llama-3.1-8b-instant",
         messages=[{"role": "system", "content": prompt}],
     )
 
@@ -288,7 +286,11 @@ def policy_agent_node(state):
     )
 
     print("Policy agent completed")
-    return {"messages": [("assistant", result)]}
+    current_history = state.get("conversation_history", "")
+    return {
+        "messages": [("assistant", result)],
+        "conversation_history": current_history + f"\nPolicy Agent: {result}"
+    }
 
 
 def billing_agent_node(state):
@@ -414,7 +416,7 @@ def human_escalation_node(state):
 
     print("Generating escalation response...")
     response = resources.client.chat.completions.create(
-        model="gpt-5-mini",
+        model="llama-3.1-8b-instant",
         messages=[{"role": "system", "content": prompt}],
     )
 

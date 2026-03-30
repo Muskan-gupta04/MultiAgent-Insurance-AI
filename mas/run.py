@@ -27,7 +27,7 @@ def run_test_query(query: str, app=None):
         app = build_app()
 
     initial_state = {
-        "n_iteraton": 0,
+        "n_iteration": 0,
         "messages": [],
         "user_input": query,
         "user_intent": "",
@@ -60,5 +60,6 @@ def run_test_query(query: str, app=None):
 
 
 def build_app_with_init():
-    init_resources()
+    config = init_resources()
+    set_db_path(config["db_path"])
     return build_app()

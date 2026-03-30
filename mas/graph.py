@@ -11,7 +11,6 @@ from .agents import (
     policy_agent_node,
     supervisor_agent,
 )
-from .resources import trace_agent
 
 
 class GraphState(TypedDict):
@@ -48,7 +47,7 @@ class GraphState(TypedDict):
 
 def decide_next_agent(state):
     if state.get("needs_clarification"):
-        return "supervisor_agent"
+        return "end"
 
     if state.get("end_conversation"):
         return "end"
@@ -60,7 +59,7 @@ def decide_next_agent(state):
 
 
 def build_app():
-    wrap = trace_agent if trace_agent else (lambda f: f)
+    wrap = lambda f: f
 
     workflow = StateGraph(GraphState)
 
