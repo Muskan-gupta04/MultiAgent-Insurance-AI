@@ -1,105 +1,294 @@
-# Insurance Multi-Agent System (LangGraph + Gemini)
+# Building an Intelligent Multi-Agent Insurance Support System with LangGraph and RAG
 
-A modular Python implementation of an insurance support multi-agent system using:
-- LangGraph for orchestration
-- Google Gemini for LLM/tool-calling
-- ChromaDB for FAQ retrieval (RAG)
-- SQLite for structured policy/billing/claims data
-- Phoenix/OpenTelemetry for tracing
+!
+## Overview
 
-## Current Architecture
+This project walks through an end-to-end insurance support copilot that combines LangGraph, Retrieval-Augmented Generation (RAG), and structured data to resolve customer requests. The companion notebook (`multi-agent system.ipynb`) shows how to stand up the data stack, orchestrate specialized agents, and observe every hop with Phoenix tracing.
 
-Agents:
-- `supervisor_agent`
-- `policy_agent`
-- `billing_agent`
-- `claims_agent`
-- `general_help_agent`
-- `human_escalation_agent`
-- `final_answer_agent`
+## What’s New in the Notebook
 
-Flow:
-1. Supervisor routes the request
-2. Specialist agent handles domain work
-3. Supervisor decides to continue, escalate, or end
-4. Final answer agent returns clean user response
+- **Phoenix-powered observability**: every agent function is wrapped with an OpenTelemetry span so you can replay decisions inside Arize Phoenix.
+- **Clarification-aware supervisor**: the router uses OpenAI function calling to request missing context before delegating work.
+- **Final answer agent**: conversations end with a summarizer that rewrites the last specialist message into a customer-ready response.
+- **Guard rails for infinite loops**: the supervisor escalates to a human after three failed routing attempts.
+- **Notebook test harness**: reusable `run_test_query` helper to exercise the full graph from within the notebook.
 
-## Project Structure
+## Tech Stack
 
-```text
-insurance_multi-agent-system/
-+-- src/
-¦   +-- setup.py            # env loading + tracing decorator
-¦   +-- data_pipeline.py    # FAQ ingest + synthetic data + SQLite setup
-¦   +-- prompts.py          # all prompt templates
-¦   +-- agents.py           # LLM client + tools + agent nodes
-¦   +-- workflow.py         # LangGraph graph + run_test_query
-+-- run_project.py          # main entrypoint
-+-- smoke_test_split.py     # compile-only smoke test
-+-- requirements.txt
-+-- enhanced_workflow.mmd
-+-- README.md
+- **LangGraph** for multi-agent workflow orchestration.
+- **OpenAI GPT-5 Mini** for routing, tool-calling, and final responses.
+- **SQLite** for relational policy, billing, and claims data.
+- **ChromaDB** for semantic FAQ retrieval.
+- **Arize Phoenix** (OpenTelemetry backend) for tracing and debugging.
+
+## Architecture
+
+```mermaid
+graph TD
+    User[User Query] --> Supervisor[Supervisor Agent]
+    Supervisor --> Policy[Policy Agent]
+    Supervisor --> Billing[Billing Agent]
+    Supervisor --> Claims[Claims Agent]
+    Supervisor --> General[General Help Agent]
+    Supervisor --> Human[Human Escalation Agent]
+    Supervisor --> Final[Final Answer Agent]
+
+    Policy --> Database[(SQLite DB)]
+    Billing --> Database
+    Claims --> Database
+    General --> VectorDB[(ChromaDB)]
+
+    Policy --> Supervisor
+    Billing --> Supervisor
+    Claims --> Supervisor
+    General --> Supervisor
+
+    Final --> End[Conversation Complete]
+    Human --> End
 ```
 
-## Requirements
+The LangGraph workflow is compiled into a state machine. Each specialist node returns to the supervisor, which decides whether to continue the loop, escalate, or pass control to the final answer agent.
 
-- Python 3.10+
-- Internet access for:
-  - Hugging Face dataset download (`deccan-ai/insuranceQA-v2`)
-  - Gemini API calls
+## Data Foundations
 
-## Installation
+1. **FAQ Retrieval (ChromaDB)**
+   - Hugging Face dataset `deccan-ai/insuranceQA-v2` is ingested and embedded into a persistent Chroma collection (`insurance_FAQ_collection`).
+   - Retrieval batches (size 100) keep ingest jobs fast while respecting API limits.
 
-```powershell
-python -m pip install -r requirements.txt
-```
+2. **Synthetic Insurance Warehouse (SQLite)**
+   - 1,000 customers, 1,500 policies, and supporting billing, payments, and claims tables.
+   - `setup_insurance_database(sample_data)` drops and recreates the schema before inserting fresh synthetic rows, ensuring notebook re-runs stay deterministic.
 
-## Environment Variables
+## Monitoring with Phoenix
 
-Create `.env`:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.0-flash
-PHOENIX_COLLECTOR_ENDPOINT=http://localhost:4317
-```
-
-Notes:
-- `GEMINI_MODEL` is optional. Default is `gemini-2.0-flash`.
-- `PHOENIX_COLLECTOR_ENDPOINT` is optional, but warnings appear if Phoenix is not running.
-
-## Run
-
-Windows PowerShell:
-
-```powershell
-$env:PYTHONIOENCODING='utf-8'
-python run_project.py
-```
-
-This does:
-1. Build/load FAQ vector DB in `./chroma_db`
-2. Generate synthetic insurance data
-3. Recreate/populate `insurance_support.db`
-4. Execute a sample query through the graph
-
-## Test / Validation
-
-Compile smoke test:
-
-```powershell
-python smoke_test_split.py
-```
-
-## Custom Query
-
-You can run your own query from Python:
+Every agent is decorated with `@trace_agent`, a wrapper that:
+- Opens a Phoenix span with metadata such as `agent.name`, `policy.number`, and duration.
+- Captures exceptions and marks spans with `StatusCode.ERROR` for quick triage.
+- Provides a consistent way to correlate user journeys in Phoenix’s UI.
 
 ```python
-from src.data_pipeline import initialize_data_infrastructure
-from src.workflow import run_test_query
-
-initialize_data_infrastructure()
-run_test_query("What is the premium of my auto insurance policy?")
+@trace_agent
+def billing_agent_node(state):
+    logger.info("📊 Billing agent started")
+    # ... call tools, update state, emit telemetry ...
+    return updated_state
 ```
 
+Phoenix endpoint and OpenAI credentials are loaded from `.env`, so be sure to set `OPEN_AI_KEY` and `PHOENIX_COLLECTOR_ENDPOINT` before running the notebook.
+
+## Graph State & Routing Logic
+
+The notebook defines a richer `GraphState` that persists:
+
+```python
+class GraphState(TypedDict):
+    messages: Annotated[List[Any], add_messages]
+    user_input: str
+    conversation_history: Optional[str]
+    n_iteration: Optional[int]
+    user_intent: Optional[str]
+    customer_id: Optional[str]
+    policy_number: Optional[str]
+    claim_id: Optional[str]
+    next_agent: Optional[str]
+    task: Optional[str]
+    justification: Optional[str]
+    end_conversation: Optional[bool]
+    extracted_entities: Dict[str, Any]
+    database_lookup_result: Dict[str, Any]
+    requires_human_escalation: bool
+    escalation_reason: Optional[str]
+    billing_amount: Optional[float]
+    payment_method: Optional[str]
+    billing_frequency: Optional[str]
+    invoice_date: Optional[str]
+    timestamp: Optional[str]
+    final_answer: Optional[str]
+```
+
+- **Clarification cycle**: When the supervisor invokes the `ask_user` tool, it sets `needs_clarification` and waits for the follow-up before re-routing.
+- **Loop breaker**: After three supervisor loops, the state is forced to `human_escalation_agent`.
+- **END detection**: When `end_conversation` flips to `True`, the graph routes to `final_answer_agent` which pushes the user-facing summary back into the state.
+
+## Specialist Agents
+
+- **Policy / Billing / Claims Agents** use structured tool calls (`get_policy_details`, `get_payment_history`, `get_claim_status`) to ground outputs in SQLite.
+- **General Help Agent** retrieves the top three FAQ snippets from Chroma, annotating answers with relevance scores.
+- **Human Escalation Agent** acknowledges the handoff and logs `escalation_reason` for operational dashboards.
+- **Final Answer Agent** rewrites the latest specialist response into a polite closing stanza so that users always receive a clean summary.
+
+## Running the Notebook
+
+1. `pip install -r requirements.txt`
+2. Populate environment variables (`OPEN_AI_KEY`, `PHOENIX_COLLECTOR_ENDPOINT`).
+3. Run the “Data Infrastructure” cells to seed Chroma and SQLite.
+4. Execute the “Setting up Nodes and Edges in LangGraph” section to compile the workflow and render the mermaid preview.
+5. Use the testing helpers to exercise scenarios:
+
+```python
+run_test_query("What is the premium of my auto insurance policy?")
+run_test_query("In general, what does life insurance cover?")
+run_test_query("I want to talk to human executive")
+```
+
+Each invocation prints the agent hop trace and the final customer answer.
+
+## Sample Walkthroughs
+
+- **Billing Premium Lookup**: Supervisor obtains the missing policy number, billing agent queries SQLite, final answer agent produces a concise plan overview.
+- **FAQ Support**: Supervisor detects general intent, FAQ agent returns a grounded answer with retrieved context, and the final agent wraps up with a friendly closing.
+- **Escalation Path**: Explicit escalation requests or three failed supervisor loops push control to the human escalation agent, preserving the conversation history for handoff.
+
+## Next Steps
+
+1. Plug in live insurance systems by swapping the SQLite helpers for REST or gRPC clients.
+2. Extend RAG coverage with additional knowledge bases (policy booklets, state regulations).
+3. Add automated evaluation by replaying `run_test_query` scenarios with Phoenix traces and regression metrics.
+5. **User Experience** - Natural conversation flow with context retention
+
+
+
+
+## 🔍 Technical Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Orchestration | LangGraph |
+| LLM | OpenAI GPT-4 |
+| Vector DB | ChromaDB |
+| Relational DB | SQLite |
+| Embeddings | Sentence Transformers |
+| Framework | LangChain Community |
+| Data Processing | Pandas, NumPy |
+| Logging | Python logging |
+
+---
+
+## 🎓 Key Learnings
+
+### 1. **State Design is Critical**
+
+Designing a comprehensive state structure upfront saves refactoring later. Include fields for:
+- Conversation tracking
+- Entity extraction
+- Routing decisions
+- Escalation flags
+
+### 2. **Prompt Engineering for Routing**
+
+The supervisor prompt must:
+- Clearly define agent responsibilities
+- Provide decision guidelines
+- Request structured output (JSON)
+- Avoid redundant questions
+
+### 3. **RAG Requires Quality Data**
+
+The General Help Agent's effectiveness depends on:
+- Curated FAQ datasets
+- Proper chunking and metadata
+- Relevance scoring thresholds
+- Fallback strategies for low-confidence matches
+
+### 4. **Tool Design Matters**
+
+Effective tools should:
+- Have clear, specific purposes
+- Return structured data
+- Handle errors gracefully
+- Log all database queries
+
+---
+
+## 🔮 Future Enhancements
+
+### 1. **Memory and Personalization**
+
+Add long-term memory to remember:
+- Customer preferences
+- Past issues and resolutions
+- Communication style
+
+### 2. **Proactive Assistance**
+
+Agents could:
+- Predict user needs based on patterns
+- Send reminders for upcoming renewals
+- Alert about policy changes
+
+### 3. **Multi-Modal Support**
+
+Extend to handle:
+- Document uploads (claim photos)
+- Voice interactions
+- Video consultations
+
+### 4. **Advanced Analytics**
+
+Implement:
+- Sentiment analysis for escalation prediction
+- Conversation quality metrics
+- Agent performance dashboards
+
+### 5. **Fine-Tuned Models**
+
+Train domain-specific models:
+- Insurance entity extraction
+- Intent classification
+- Response generation
+
+---
+
+## 🛠️ Getting Started
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Muskan-gupta04/MultiAgent-Insurance-AI
+cd multi-agent-system
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Configuration
+
+Create a `.env` file:
+```
+OPEN_AI_KEY=your_openai_api_key
+```
+
+### Running the System
+
+```python
+# Initialize the database
+setup_insurance_database()
+
+# Load FAQ data into ChromaDB
+collection = client.get_or_create_collection(name="insurance_FAQ_collection")
+
+# Run a test query
+test_query = "What is my auto insurance premium?"
+final_output = run_test_query(test_query)
+```
+
+---
+
+## 📚 Dependencies
+
+```
+langgraph
+langchain-openai
+langchain-community
+chromadb
+sentence-transformers
+pandas
+scikit-learn
+datasets
+python-dotenv
+beautifulsoup4
+requests
+```
+
+---
