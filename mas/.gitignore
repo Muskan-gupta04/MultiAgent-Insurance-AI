@@ -1,0 +1,6 @@
+.env
+chroma_db
+insurance_support.db
+*.log
+__pycache__/
+*.pyc
